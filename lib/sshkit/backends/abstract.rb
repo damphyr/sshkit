@@ -4,10 +4,6 @@ module SSHKit
 
     MethodUnavailableError = Class.new(SSHKit::StandardError)
 
-    module Result
-      attr_accessor :exit_status,:stderr,:stdout
-    end
-    
     class Abstract
 
       attr_reader :host
@@ -133,18 +129,6 @@ module SSHKit
         SSHKit::Command.new(*[*args, options.merge({in: @pwd.nil? ? nil : File.join(@pwd), env: @env, host: @host, user: @user, group: @group})])
       end
 
-      def connection
-        raise "No Connection Pool Implementation"
-      end
-
-      def result(r,cmd)
-        r.tap do |res|
-          res.extend(SSHKit::Backend::Result)
-          res.exit_status=cmd.exit_status
-          res.stdout=cmd.full_stdout.strip
-          res.stderr=cmd.full_stderr.strip
-        end
-      end
     end
 
   end
