@@ -133,10 +133,6 @@ module SSHKit
         SSHKit::Command.new(*[*args, options.merge({in: @pwd.nil? ? nil : File.join(@pwd), env: @env, host: @host, user: @user, group: @group})])
       end
 
-      def connection
-        raise "No Connection Pool Implementation"
-      end
-
     end
 
   end

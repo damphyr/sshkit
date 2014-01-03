@@ -8,6 +8,7 @@ Gem::Specification.new do |gem|
   gem.summary       = %q{SSHKit makes it easy to write structured, testable SSH commands in Ruby}
   gem.description   = %q{A comprehensive toolkit for remotely running commands in a structured manner on groups of servers.}
   gem.homepage      = "http://github.com/capistrano/sshkit"
+  gem.license       = "GPL3"
 
   gem.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
   gem.files         = `git ls-files`.split("\n")
@@ -25,10 +26,5 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency('turn')
   gem.add_development_dependency('unindent')
   gem.add_development_dependency('mocha')
-  gem.add_development_dependency('debugger')
-  gem.add_development_dependency('vagrant')
-
-  gem.add_development_dependency('yard')
-  gem.add_development_dependency('redcarpet')
 
 end

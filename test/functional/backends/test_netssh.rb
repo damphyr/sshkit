@@ -28,7 +28,7 @@ module SSHKit
       end
 
       def a_host
-        vm_hosts.first
+        VagrantWrapper.hosts['one']
       end
 
       def printer
@@ -54,11 +54,13 @@ module SSHKit
       def test_capture
         File.open('/dev/null', 'w') do |dnull|
           SSHKit.capture_output(dnull) do
-            captured_command_result = ""
+            captured_command_result = nil
             Netssh.new(a_host) do |host|
-              captured_command_result = capture(:hostname)
+              captured_command_result = capture(:uname)
             end.run
-            assert_equal "lucid32", captured_command_result
+
+            assert captured_command_result
+            assert_match captured_command_result, /Linux|Darwin/
           end
         end
       end
@@ -69,7 +71,7 @@ module SSHKit
             execute :echo, "'Test capturing stderr' 1>&2; false"
           end.run
         end
-        assert_equal "echo stdout: Nothing written\necho stderr: Test capturing stderr\n", err.message
+        assert_equal "echo exit status: 1\necho stdout: Nothing written\necho stderr: Test capturing stderr\n", err.message
       end
 
       def test_test_does_not_raise_on_non_zero_exit_status
@@ -130,7 +132,6 @@ module SSHKit
         end.run
         assert_equal File.open(file_name).read, file_contents
       end
-
     end
 
   end

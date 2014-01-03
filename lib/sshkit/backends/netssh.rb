@@ -95,7 +95,11 @@ module SSHKit
         ssh.scp.download!(remote, local, options, &summarizer)
       end
 
+      @pool = SSHKit::Backend::ConnectionPool.new
+
       class << self
+        attr_accessor :pool
+
         def configure
           yield config
         end
@@ -175,10 +179,11 @@ module SSHKit
       def ssh
         @ssh ||= begin
           host.ssh_options ||= Netssh.config.ssh_options
-          Net::SSH.start(
+          self.class.pool.create_or_reuse_connection(
             String(host.hostname),
             host.username,
-            host.netssh_options
+            host.netssh_options,
+            &Net::SSH.method(:start)
           )
         end
       end

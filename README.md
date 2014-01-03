@@ -3,25 +3,27 @@
 **SSHKit** is a toolkit for running commands in a structured way on one or
 more servers.
 
-[![Build Status](https://travis-ci.org/leehambley/sshkit.png?branch=master)](https://travis-ci.org/leehambley/sshkit)
+[![Build Status](https://travis-ci.org/capistrano/sshkit.png?branch=master)](https://travis-ci.org/capistrano/sshkit)
 [![Dependency Status](https://gemnasium.com/leehambley/sshkit.png)](https://gemnasium.com/leehambley/sshkit)
 
 ## How might it work?
 
 The typical use-case looks something like this:
 
-    require 'sshkit/dsl'
+```ruby
+require 'sshkit/dsl'
 
-    on %w{1.example.com 2.example.com}, in: :sequence, wait: 5 do
-      within "/opt/sites/example.com" do
-        as :deploy  do
-          with rails_env: :production do
-            rake   "assets:precompile"
-            runner "S3::Sync.notify"
-          end
-        end
+on %w{1.example.com 2.example.com}, in: :sequence, wait: 5 do
+  within "/opt/sites/example.com" do
+    as :deploy  do
+      with rails_env: :production do
+        rake   "assets:precompile"
+        runner "S3::Sync.notify"
       end
     end
+  end
+end
+```
 
 One will notice that it's quite low level, but exposes a convenient API, the
 `as()`/`within()`/`with()` are nestable in any order, repeatable, and stackable.
@@ -55,13 +57,15 @@ Helpers such as `runner()` and `rake()` which expand to `execute(:rails, "runner
 Notice on the `on()` call the `in: :sequence` option, the following will do
 what you might expect:
 
-    on(in: :parallel, limit: 2) { ...}
-    on(in: :sequence, wait: 5) { ... }
-    on(in: :groups, limit: 2, wait: 5) { ... }
+```ruby
+on(in: :parallel) { ... }
+on(in: :sequence, wait: 5) { ... }
+on(in: :groups, limit: 2, wait: 5) { ... }
+```
 
-The default is to run `in: :parallel` with no limit, if you have 400 servers,
-this might be a problem, and you might better look at changing that to run in
-groups, or sequence.
+The default is to run `in: :parallel` which has no limit. If you have 400 servers,
+this might be a problem and you might better look at changing that to run in
+`groups`, or `sequence`.
 
 Groups were designed in this case to relieve problems (mass Git checkouts)
 where you rely on a contested resource that you don't want to DDOS by hitting
@@ -77,28 +81,30 @@ for all servers to complete before it returns.
 
 For example:
 
-    all_servers = %w{one.example.com two.example.com three.example.com}
-    site_dir    = '/opt/sites/example.com'
+```ruby
+all_servers = %w{one.example.com two.example.com three.example.com}
+site_dir    = '/opt/sites/example.com'
 
-    # Let's simulate a backup task, assuming that some servers take longer
-    # then others to complete
-    on servers do |host|
-      in site_dir do
-        execute :tar, '-czf', "backup-#{host.hostname}.tar.gz", 'current'
-        # Will run: "/usr/bin/env tar -czf backup-one.example.com.tar.gz current"
-      end
-    end
+# Let's simulate a backup task, assuming that some servers take longer
+# then others to complete
+on all_servers do |host|
+  in site_dir do
+    execute :tar, '-czf', "backup-#{host.hostname}.tar.gz", 'current'
+    # Will run: "/usr/bin/env tar -czf backup-one.example.com.tar.gz current"
+  end
+end
 
-    # Now we can do something with those backups, safe in the knowledge that
-    # they will all exist (all tar commands exited with a success status, or
-    # that we will have raised an exception if one of them failed.
-    on servers do |host|
-      in site_dir do
-        backup_filename = "backup-#{host.hostname}.tar.gz"
-        target_filename = "backups/#{Time.now.utc.iso8601}/#{host.hostname}.tar.gz"
-        puts capture(:s3cmd, 'put', backup_filename, target_filename)
-      end
-    end
+# Now we can do something with those backups, safe in the knowledge that
+# they will all exist (all tar commands exited with a success status, or
+# that we will have raised an exception if one of them failed.
+on all_servers do |host|
+  in site_dir do
+    backup_filename = "backup-#{host.hostname}.tar.gz"
+    target_filename = "backups/#{Time.now.utc.iso8601}/#{host.hostname}.tar.gz"
+    puts capture(:s3cmd, 'put', backup_filename, target_filename)
+  end
+end
+```
 
 ## The Command Map
 
@@ -112,9 +118,11 @@ configuration are not where they are expected to be.
 To try and solve this there is the `with()` helper which takes a hash of variables and makes them
 available to the environment.
 
-    with path: '/usr/local/bin/rbenv/shims:$PATH' do
-      execute :ruby, '--version'
-    end
+```ruby
+with path: '/usr/local/bin/rbenv/shims:$PATH' do
+  execute :ruby, '--version'
+end
+```
 
 Will execute:
 
@@ -128,8 +136,10 @@ The *command map* exists on the configuration object, and in principle is
 quite simple, it's a *Hash* structure with a default key factory block
 specified, for example:
 
-    puts SSHKit.config.command_map[:ruby]
-    # => /usr/bin/env ruby
+```ruby
+puts SSHKit.config.command_map[:ruby]
+# => /usr/bin/env ruby
+```
 
 The `/usr/bin/env` prefix is applied to all commands, to make clear that the
 environment is being deferred to to make the decision, this is what happens
@@ -138,26 +148,32 @@ explicit, it was hoped that it might lead people to explore the documentation.
 
 One can override the hash map for individual commands:
 
-    SSHKit.config.command_map[:rake] = "/usr/local/rbenv/shims/rake"
-    puts SSHKit.config.command_map[:rake]
-    # => /usr/local/rbenv/shims/rake
+```ruby
+SSHKit.config.command_map[:rake] = "/usr/local/rbenv/shims/rake"
+puts SSHKit.config.command_map[:rake]
+# => /usr/local/rbenv/shims/rake
+```
 
-Another oportunity is to add command prefixes:
+Another opportunity is to add command prefixes:
 
-    SSHKit.config.command_map.prefix[:rake].push("bundle exec")
-    puts SSHKit.config.command_map[:rake]
-    # => bundle exec rake
+```ruby
+SSHKit.config.command_map.prefix[:rake].push("bundle exec")
+puts SSHKit.config.command_map[:rake]
+# => bundle exec rake
 
-    SSHKit.config.command_map.prefix[:rake].unshift("/usr/local/rbenv/bin exec")
-    puts SSHKit.config.command_map[:rake]
-    # => /usr/local/rbenv/bin exec bundle exec rake
+SSHKit.config.command_map.prefix[:rake].unshift("/usr/local/rbenv/bin exec")
+puts SSHKit.config.command_map[:rake]
+# => /usr/local/rbenv/bin exec bundle exec rake
+```
 
 One can also override the command map completely, this may not be wise, but it
 would be possible, for example:
 
-    SSHKit.config.command_map = Hash.new do |hash, command|
-      hash[command] = "/usr/local/rbenv/shims/#{command}"
-    end
+```ruby
+SSHKit.config.command_map = Hash.new do |hash, command|
+  hash[command] = "/usr/local/rbenv/shims/#{command}"
+end
+```
 
 This would effectively make it impossible to call any commands which didn't
 provide an executable in that directory, but in some cases that might be
@@ -176,7 +192,9 @@ default this is *$stdout*, but can be any object responding to a
 
 The *formatter* and *output* have a strange relationship:
 
-    SSHKit.config.output = SSHKit.config.formatter.new($stdout)
+```ruby
+SSHKit.config.output = SSHKit.config.formatter.new($stdout)
+```
 
 The *formatter* will typically delegate all calls to the *output*, depending
 on it's implementation it will almost certainly override the implementation of
@@ -189,10 +207,33 @@ By default calls to `capture()` and `test()` are not logged, they are used
 *so* frequently by backend tasks to check environmental settings that it
 produces a large amount of noise. They are tagged with a verbosity option on
 the `Command` instances of `Logger::DEBUG`. The default configuration for
-output verbosity is avaialble to override with `SSHKit.config.output_verbosity=`,
+output verbosity is available to override with `SSHKit.config.output_verbosity=`,
 and defaults to `Logger::INFO`.
 
 At present the `Logger::WARN`, `ERROR` and `FATAL` are not used.
+
+## Connection Pooling
+
+SSHKit uses a simple connection pool (enabled by default) to reduce the
+cost of negotiating a new SSH connection for every `on()` block. Depending on
+usage and network conditions, this can add up to a significant time savings.
+In one test, a basic `cap deploy` ran 15-20 seconds faster thanks to the
+connection pooling added in recent versions of SSHKit.
+
+To prevent connections from "going stale", an existing pooled connection will
+be replaced with a new connection if it hasn't been used for more than 30
+seconds. This timeout can be changed as follows:
+
+```ruby
+SSHKit::Backend::Netssh.pool.idle_timeout = 60 # seconds
+```
+
+If you suspect the connection pooling is causing problems, you can disable the
+pooling behaviour entirely by setting the idle_timeout to zero:
+
+```ruby
+SSHKit::Backend::Netssh.pool.idle_timeout = 0 # disabled
+```
 
 ## Known Issues
 
@@ -224,15 +265,15 @@ At present the `Logger::WARN`, `ERROR` and `FATAL` are not used.
 * No method for uploading or downloading files, or the same for saving/loading
   a string to/from a remote file.
 * No closing of connections, the abstract backend class should include a
-  cleanup method which is empty but can be overriden by other implementations.
-* No conncetion pooling, the `connection` method of the NetSSH backend could
+  cleanup method which is empty but can be overridden by other implementations.
+* ~~No connection pooling, the `connection` method of the NetSSH backend could
   easily be modified to look into some connection factory for it's objects,
-  saving half a second when running lots of `on()` blocks.
+  saving half a second when running lots of `on()` blocks.~~
 * Documentation! (YARD style)
 * Wrap all commands in a known shell, that is that `execute('uptime')` should
   be converted into `sh -c 'uptime'` to ensure that we have a consistent shell
   experience.
-* There's no suitable host parser that accepts `Host.new('user@ip:port')`, it
-  will decode a `user@hostname:port`, but IP addresses don't work.
+* ~~There's no suitable host parser that accepts `Host.new('user@ip:port')`, it
+  will decode a `user@hostname:port`, but IP addresses don't work.~~
 * If Net::SSH raises `IOError` (as it does when authentication fails) this
   needs to be caught, and re-raised as some kind of ConnectionFailed error.
